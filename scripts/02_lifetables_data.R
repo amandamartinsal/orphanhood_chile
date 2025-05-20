@@ -1,17 +1,13 @@
-library(dplyr)
-library(readr)
-library(httr)
+## |= Chilean Life Tables ======================================================
 
-# -------------------------------
-# PART 1: Life Tables from 1989–1991
+##  |- Life Tables from 1989–1991======================================
 # Source: Human Life Table (www.lifetable.de)
-# -------------------------------
 
 # List of file information
 file_info <- list(
   list(
     url = "https://www.lifetable.de/File/GetDocument/data/CHL/CHL000019861989CU1.txt",
-    use_year2 = TRUE,       # Use Year2 column for this dataset
+    use_year2 = TRUE,       # Use Year2 column for this data set
     filter_ageint = TRUE    # Apply special filtering for age intervals (to fix duplication)
   ),
   list(
@@ -21,13 +17,15 @@ file_info <- list(
   ),
   list(
     url = "https://www.lifetable.de/File/GetDocument/data/CHL/CHL000019911992AU1.txt",
-    use_year2 = FALSE,      # Use Year1 column for this dataset
+    use_year2 = FALSE,      # Use Year1 column for this data set
     filter_ageint = FALSE
   )
 )
 
 # Function to download and clean each file
-process_file <- function(url, use_year2 = TRUE, filter_ageint = FALSE) {
+
+process_file <-
+  function(url, use_year2 = TRUE, filter_ageint = FALSE) {
   df <- read_csv(url, show_col_types = FALSE)
   
   year_val <- if (use_year2) df$Year2[1] else df$Year1[1]
@@ -65,15 +63,19 @@ chile_lt1989to1991 <-
 chile_lt1989to1991 <- chile_lt1989to1991 %>%
   filter(!(Year == 1991 & Age %in% 2:4))
 
-# -------------------------------
-# PART 2: Life Tables from 1992–2020
+## |-  Life Tables from 1992–2020=======================================
 # Source: Human Mortality Database (https://www.mortality.org)
-# -------------------------------
 
-# IMPORTANT: You must manually download the file and place it in "data/fltper_5x1.txt"
+# Important: You must manually download the file and place it in "data/fltper_5x1.txt"
 
 # Read HMD file and clean
 chile_lt1992to2020 <- read_table("data/fltper_5x1.txt", skip = 1)
+
+# Vector with nax to use to estimate e0 later
+chile_ax <- chile_lt1992to2020 %>% 
+  filter(Year == 1992) %>%  
+  slice(1:22)  %>% 
+  pull(ax)
 
 # Add age group
 chile_lt1992to2020 <- chile_lt1992to2020 %>% 
@@ -81,20 +83,16 @@ chile_lt1992to2020 <- chile_lt1992to2020 %>%
   select(year = Year, age_group, lx) %>% 
   mutate(lx = lx / 1e5) 
 
-# -------------------------------
-# PART 3: Merge Both Datasets
-# -------------------------------
+## |- Merge Both Data sets==============================================
 
 # Rename column to match before binding
 chile_lt1989to1991 <- chile_lt1989to1991 %>% 
   rename(age_group = Age, lx = `l(x)`, year = Year)
 
-# Merge datasets (1989–1991 + 1992–2020)
+# Merge data sets (1989–1991 + 1992–2020)
 chile_lt <- bind_rows(chile_lt1989to1991, chile_lt1992to2020)
 
-# -------------------------------
-# PART 4: Compute np25_s (survival probabilities from age 25+)
-# -------------------------------
+## |- Compute np25_s (survival probabilities from age 25+)==============
 
 chile_np25 <- chile_lt %>% 
   filter(age_group >= 25) %>% 
